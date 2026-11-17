@@ -1,0 +1,26 @@
+\documentclass{article}
+\usepackage[paperwidth=18in,paperheight=18in,margin=0in]{geometry}
+\input{kit.tex}
+\usepackage{xcolor}
+\definecolor{paper}{HTML}{F4EFE6}
+\definecolor{ink}{HTML}{131211}
+\pagestyle{empty}\parindent=0pt\topskip=0pt
+\newbox\Page
+\input{value.tex}
+\begin{document}
+\pagecolor{paper}\color{ink}%
+\vbox to\paperheight{\offinterlineskip
+  \vskip 1.35in
+  \hbox to\paperwidth{\hss{\Num\setbox\Page\hbox{\input{body.tex}}\ht\Page=973bp \dp\Page=0pt \box\Page}\hss}
+  \vskip .34in
+  \hbox to\paperwidth{\hss\fontsize{8.7bp}{10bp}\selectfont$=\;$\TheValue\hss}
+  \vss
+  \hbox to\paperwidth{\hss\fontsize{11bp}{14bp}\selectfont
+     One expression; it evaluates to the \TheDigits-digit integer above.\qquad
+     Side by side means multiplied.\quad $\lVert\,\cdots\rVert_{1}$ is the sum of its rows.\quad
+     A numeral inside $|\;|$, $[\;]$, $\lfloor\;\rfloor$, $\lceil\;\rceil$ is itself.\hss}
+  \vskip .16in
+  \hbox to\paperwidth{\hss\fontsize{11bp}{14bp}\selectfont
+     One font, one weight: the tone is the structure.\qquad\textperiodcentered\qquad Typeset in \LaTeX\hss}
+  \vskip 1.0in}
+\end{document}

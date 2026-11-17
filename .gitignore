@@ -1,0 +1,7 @@
+work/
+target.npy
+source.png
+*.aux
+*.log
+__pycache__/
+.DS_Store

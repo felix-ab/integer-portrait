@@ -1,0 +1,7 @@
+1. expression.txt: 73035 characters; 16 stacks, 30 integral signs, 19848 strokes, 16685 numerals
+   evaluated independently: an integer of 221 digits; equal to value.txt: True
+   type int, exact (no floating point anywhere)
+2. page vs requested tone, blurred over 6 bp: correlation 0.966, rms ink error 0.032
+2. page vs requested tone, blurred over 12 bp: correlation 0.985, rms ink error 0.021
+   mean ink requested 0.219, printed 0.224; lightest region 0.001, darkest 0.417
+3. glyphs in the PDF text layer: 16763 digits (numerals 16685 + limits, indices and integrands)
