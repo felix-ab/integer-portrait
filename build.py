@@ -24,7 +24,8 @@ inside a tall bracket are the lines of one sum: every line after the first
 begins with +. Things side by side are factors of a product.
 
 Needs a photograph as source.png (not included in the repository).
-Writes body.tex (LaTeX), value.tex, expression.txt (linear form) and value.txt.
+Writes portrait.tex (the complete, self-contained LaTeX file, from template.tex),
+value.tex, expression.txt (the expression on one line) and value.txt.
 """
 import sys, json, math, random
 import numpy as np
@@ -423,44 +424,65 @@ open('value.txt', 'w').write(str(N) + '\n')
 open('value.tex', 'w').write('\\def\\TheValue{%s}\\def\\TheDigits{%d}\n' % (N, len(str(N))))
 
 # ------------------------------------------------------------------ LaTeX
-# Each line of a sum is one running row: \K moves right, delimiters are rules,
-# numerals are plain text. Coordinates are bp from the row's baseline (floor + .3).
-BASE = 0.3
-NAME = {('brk', 'l'): 'OpenBracket', ('brk', 'r'): 'CloseBracket', ('flr', 'l'): 'OpenFloor', ('flr', 'r'): 'CloseFloor',
-        ('cel', 'l'): 'OpenCeil', ('cel', 'r'): 'CloseCeil'}
+# The expression is written as ordinary LaTeX mathematics. A line is a running row:
+# \kern moves right, a strut fixes a height, everything else is standard notation.
+WPLUS, WDOT = 7.313, 2.6              # widths of + (as the font sets it) and of \cdot (the drawing layer sets it this wide)
+AX = 3.2                              # a line's baseline lies this far below its middle
+SHORT = {('brk', 'l'): '[', ('brk', 'r'): ']', ('flr', 'l'): r'\lfloor', ('flr', 'r'): r'\rfloor',
+         ('cel', 'l'): r'\lceil', ('cel', 'r'): r'\rceil'}
 
 
 def f(x):
-    return ('%.2f' % x).rstrip('0').rstrip('.')
+    t = ('%.2f' % x).rstrip('0').rstrip('.')
+    return '0' if t in ('-0', '') else t
+
+
+def strut(h):
+    """an invisible rule of total height h, placed so that numerals sit at mid-height"""
+    return r'\vrule height%sbp depth%sbp width0pt ' % (f(h / 2 + AX), f(h / 2 - AX))
 
 
 class Row:
     def __init__(self):
-        self.s, self.cur = [], 0.0
+        self.s, self.cur, self.next_digit = [], 0.0, None
 
     def go(self, x):
         d = x - self.cur
-        if abs(d) > 0.004:
-            self.s.append(r'\K{%s}' % f(d))
+        assert d > -0.004, 'the row would have to move left by %.3f' % -d      # spacing is never negative
+        if f(d) != '0':
+            self.s.append(r'\kern%sbp' % f(d))
         self.cur = x
+        self.next_digit = None
 
-    def stroke(self, kd, side, x, yb, h):
+    def stroke(self, kd, side, x, tall_h=None):
         stats['strokes'] += 1
         self.go(x)
-        self.s.append(r'\%s{%s}{%s}' % (NAME[kd, side], f(yb - BASE), f(yb - BASE + h)))
+        if tall_h is None:
+            self.s.append(SHORT[kd, side])
+        elif side == 'l':
+            self.s.append(r'\left' + SHORT[kd, 'l'] + strut(tall_h))
+        else:
+            self.s.append(r'\right' + SHORT[kd, 'r'])
         self.cur = x + TH
+        self.next_digit = None
 
-    def num(self, x, d, lift=0.0):
+    def num(self, x, d):
         stats['numerals'] += 1
-        self.go(x)
-        self.s.append(str(d) if not lift else r'\Lift{%s}{%d}' % (f(lift), d))
-        self.cur = x + ADV
+        if self.next_digit is not None and abs(x - self.next_digit) < 0.01:
+            pass                                    # the next digit of the same integer: nothing may come between digits
+        else:
+            self.go(x)
+        self.s.append(str(d))
+        self.cur += ADV
+        self.next_digit = x + ADV
 
-    def op(self, x, w, sym, lift=0.0):
+    def op(self, x, w, sym):
         stats['plus' if sym == '+' else 'dots'] += 1
-        self.go(x)
-        self.s.append(r'\%s{%s}{%s}' % ('Plus' if sym == '+' else 'Times', f(w), f(lift)))
-        self.cur = x + w
+        g = WPLUS if sym == '+' else WDOT
+        self.go(x + (w - g) / 2)
+        self.s.append('+' if sym == '+' else r'\cdot')
+        self.cur += g
+        self.next_digit = None
 
 
 def emit_units(row, units, x0, h, tall):
@@ -473,54 +495,53 @@ def emit_units(row, units, x0, h, tall):
         elif u['u'] == 'int':
             lo, up, tx, _, _ = u['spec']; stats['ints'] += 1; stats['strokes'] += 1
             row.go(x)
-            row.s.append(r'\Integral{%s}{%s}{%d}{%d}{%s}{%s}{%s}' % (f(0.6 - BASE), f(h - 1.2), lo, up, tx.replace('x', u['var']), f(h / 2 - RP / 2), u['var']))
+            row.s.append(r'\int_{%d}^{%d}%s\,\mathrm{d}%s' % (lo, up, tx.replace('x', u['var']), u['var']))
+            row.next_digit = None
         else:
-            k, hh = u['k'], (h - 1.2 if tall else FH)
-            yb = 0.6 if tall else (RP - FH) / 2
+            k = u['k']
             w = u['inner'] + TH + 2 * k * DL
+            th = (h - 1.2) if tall else None
             for i, kd in enumerate(u['kinds']):                    # opening delimiters, outermost first
-                row.stroke(kd, 'l', x + i * DL, yb, hh)
-            row.num(x + k * DL + (u['inner'] + TH - DL - ADV) / 2 + (DL - TH) / 2 + TH / 2, u['d'], (h / 2 - RP / 2) if tall else 0.0)
+                row.stroke(kd, 'l', x + i * DL, th)
+            row.num(x + k * DL + (u['inner'] + TH - DL - ADV) / 2 + (DL - TH) / 2 + TH / 2, u['d'])
             for i in reversed(range(k)):                           # closing delimiters, innermost first
-                row.stroke(u['kinds'][i], 'r', x + w - TH - i * DL, yb, hh)
+                row.stroke(u['kinds'][i], 'r', x + w - TH - i * DL, th)
 
 
 def emit(stk):
-    """a sum whose lines are stacked inside one tall pair of brackets"""
-    xa, xb = stk['x']; r0, r1 = stk['r']; Hs = (r1 - r0) * RP
+    """[ a sum broken over the lines of an aligned environment ]"""
+    xa, xb = stk['x']; r0, r1 = stk['r']; Hs = (r1 - r0) * RP; Ws = xb - xa
     stats['strokes'] += 2
-    s = [r'\BeginSum{%s}{%s}' % (f(xb - xa), f(Hs))]
+    lines = []
     for i, (a, b, items) in enumerate(stk['ent']):
-        y0 = (r1 - b) * RP; h = (b - a) * RP
+        h = (b - a) * RP
         row = Row()
         if i:                                                      # every line after the first begins with +
-            row.op(1.5, PW, '+', h / 2 - RP / 2)
+            row.op(0.0, PW, '+')
         for it in items:
             if it['t'] == 'stk':
-                row.go(it['x'][0] - xa)
-                row.s.append(r'\Factor ' + emit(it) + r'\EndFactor ')
+                row.go(it['x'][0] - xa - 1.5 + 0.3)
+                row.s.append(emit(it))
+                row.cur = it['x'][1] - xa - 1.5 - 0.3; row.next_digit = None
             else:
-                emit_units(row, it['units'], xa, h, it['t'] == 'leaf')
-        s.append(r'\Row{%s}' % f(y0 + BASE) + ''.join(row.s) + '\\EndRow%\n')
-    s.append(r'\EndSum')
-    return ''.join(s)
+                emit_units(row, it['units'], xa + 1.5, h, it['t'] == 'leaf')
+        row.go(Ws - 3.0)                                           # all lines of a sum are equally wide
+        lines.append('&' + strut(h) + ''.join(row.s))
+    return (r'\left[' + strut(Hs - 1.2) + r'\kern0.7bp\begin{aligned}' + '\n'
+            + ('\\\\\n').join(lines) + '\n' + r'\end{aligned}\kern0.7bp\right]')
 
 
-HEADER = """% One mathematical expression. Generated by build.py.
-%
-% Notation (all standard):  decimal integers;  products by juxtaposition or \\cdot;  sums with +,
-% including sums whose lines are stacked inside a tall pair of brackets (every line after the
-% first begins with +);  [ ] grouping, floor and ceiling;  definite integrals of polynomials.
-%
-% Layout macros (kit.tex):  \\K = horizontal move,  \\Lift = a numeral raised to the middle of a tall
-% bracket,  \\Open.../\\Close... = a delimiter drawn from one height to another,  \\Plus, \\Times = the
-% operators + and \\cdot,  \\Integral{..}{..}{a}{b}{f}{..}{x} = \\int_a^b f dx,
-% \\BeginSum ... \\EndSum = [ lines of a sum ],  \\Row ... \\EndRow = one line,  \\Factor = a bracketed
-% sum used as a factor.
-"""
-open('body.tex', 'w').write(HEADER + emit(root) + '%\n')
+BODY = r'\kern0.3bp' + emit(root) + r'\kern0.3bp'
 digits = len(str(N))
 json.dump(dict(stats, lines=LINES, value_digits=digits, W=W, H=H), open('stats.json', 'w'))
+T_ = open('template.tex').read()
+doc = (T_.replace('@@VALUE@@', '\n'.join('%     ' + str(N)[i:i + 60] for i in range(0, digits, 60)))
+         .replace('@@DIGITS@@', str(digits)).replace('@@LINES@@', str(LINES)).replace('@@SUMS@@', str(stats['stk']))
+         .replace('@@INTS@@', str(stats['ints'])).replace('@@BODY@@', BODY)
+         .replace('@@LINEAR@@', expr).replace('@@N@@', str(N)).replace('@@CHECKER@@', open('check.py').read()))
+open('portrait.tex', 'w').write(doc)
+assert '-' not in BODY and '%' not in BODY
+open('expression.tex', 'w').write(BODY + '\n')          # the bare mathematics: stock LaTeX, no comments, no definitions
 print('bracketed sums %(stk)d, long-stroke leaves %(leaf)d, fine rows %(seg)d' % stats)
 print('delimiter strokes %(strokes)d (integral signs %(ints)d), numerals %(numerals)d, plus signs %(plus)d, dots %(dots)d, longest stroke %(longest).0f bp' % stats)
 print('notation audit passed on %d lines of the sum' % LINES)

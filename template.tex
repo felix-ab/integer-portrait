@@ -1,0 +1,147 @@
+% =============================================================================
+%  A PORTRAIT THAT IS ONE INTEGER          github.com/felix-ab/integer-portrait
+%
+%  This file is complete. It compiles on its own (XeLaTeX, or Tectonic) and it
+%  contains everything needed to read the expression and to compute its value.
+%  Nothing in it refers to another file.
+%
+%  1. THE EXPRESSION (between the two marker lines further down) is ordinary
+%     LaTeX mathematics. It uses only these, each with its standard meaning:
+%
+%       0 1 2 ... 9                     decimal integers; a run of digits is one integer
+%       +      \cdot                    addition, multiplication
+%       [ ... ]                         grouping
+%       \lfloor ... \rfloor             floor
+%       \lceil  ... \rceil              ceiling
+%       \left   \right                  size prefixes for those three delimiter pairs
+%       \int_{a}^{b} f \,\mathrm{d}x    a definite integral; f is nothing (that is, 1), x or 2x
+%       \begin{aligned} & ... \\ & + ... \end{aligned}
+%                                       ONE sum broken over several lines inside a bracket
+%                                       (amsmath); every line after the first begins with +
+%
+%     and these, which only position things and mean nothing mathematically:
+%
+%       \kern<length>                           horizontal space, always to the right
+%       \vrule height<h> depth<d> width0pt      an invisible strut that fixes a height
+%       \,                                      a thin space
+%       &                                       the alignment point at the start of each line
+%
+%     Adjacent factors are multiplied, as in 2[3]\lfloor 4\rfloor = 24. Two integers never
+%     stand side by side without an operator between them, nothing is ever placed between
+%     the digits of an integer, and no integer has a leading zero. There is no subtraction
+%     (the expression does not contain the character -), no division and no free variable.
+%
+%  2. WHAT IT SAYS.  The whole expression is one bracketed sum,
+%
+%          [ line_1 + line_2 + ... ]            (@@LINES@@ lines in @@SUMS@@ bracketed sums, nested)
+%
+%     Each line is a sum of products. Each factor is a positive integer, or a positive
+%     integer inside brackets, floors and ceilings, or one of @@INTS@@ definite integrals
+%     (every one of which is a positive integer), or another bracketed sum.
+%     A floor, a ceiling or a bracket around an integer leaves it unchanged: those
+%     strokes are there as ink, they make the greys of the picture. Hence the value is
+%     a positive integer. It has @@DIGITS@@ digits:
+%
+@@VALUE@@
+%
+%  3. HOW TO CHECK IT.  Delete the positioning commands and evaluate. The text after
+%     \end{document} (LaTeX ignores it) gives the value again, the same expression on one
+%     line in calculator syntax, and a short Python program (standard library only)
+%     that parses THIS file's LaTeX and evaluates it exactly:   python3 check.py portrait.tex
+%
+%  4. THE DRAWING LAYER (in the preamble) changes how the commands of the expression are
+%     DRAWN: thin strokes of exact sizes, so that the formula forms a picture. It does not
+%     change what they denote. The expression contains no comment and no command defined
+%     here. expression.tex is the same text alone, and stock.tex (nine lines: article,
+%     amsmath, \[ \input{expression.tex} \]) typesets it with unmodified LaTeX.
+% =============================================================================
+\documentclass{article}
+\usepackage[paperwidth=1080bp,paperheight=973bp,margin=0pt]{geometry}
+\usepackage{amsmath}
+\usepackage{unicode-math}
+\setmainfont{NewCM10-Book.otf}
+\setmathfont{NewCMMath-Book.otf}[StylisticSet=2]      % New Computer Modern, upright integral signs
+\pagestyle{empty}\parindent=0pt\topskip=0pt
+
+% ------------------------------------------------------------------------------
+%  THE DRAWING LAYER.  Appearance only; one font, one weight; every stroke is .5bp.
+% ------------------------------------------------------------------------------
+\makeatletter
+\newbox\P@box \newbox\P@rb \newbox\P@ia \newbox\P@ib \newbox\P@page
+% a delimiter is a vertical stroke from depth \P@d to height \P@h, with a short hook at the
+% bottom (floor), at the top (ceiling), or at both ends (bracket)
+\def\P@h{6.4}\def\P@d{0}
+\def\P@bar{\vrule width.5bp height\P@h bp depth\P@d bp}
+\def\P@hb{\vrule width.45bp height\dimexpr-\P@d bp+.45bp\relax depth\P@d bp}
+\def\P@ht{\vrule width.45bp height\P@h bp depth-\dimexpr\P@h bp-.45bp\relax}
+% \int_{a}^{b} f \mathrm{d}x : a tall sign (the font's two hooks joined by a stroke) as high as its line,
+% the limits at its two ends, the integrand at the height of the line's numerals
+\def\P@int#1#2#3#4#5{%
+  \hbox to0pt{\kern-2.39bp\fontsize{3.57bp}{3.57bp}\selectfont
+    \setbox\P@ia\hbox{$\inttop$}\setbox\P@ib\hbox{$\intbottom$}%
+    \rlap{\raise\dimexpr-\P@rd bp+.6bp+\dp\P@ib\relax\copy\P@ib}%
+    \rlap{\raise\dimexpr\P@rh bp-.6bp-\ht\P@ia\relax\copy\P@ia}%
+    \kern2.39bp\vrule width.5bp height\dimexpr\P@rh bp-.5bp-\ht\P@ia\relax
+                              depth\dimexpr\P@rd bp-.5bp-\ht\P@ib-\dp\P@ib\relax\hss}%
+  \hbox to0pt{\kern1.5bp\raise\dimexpr-\P@rd bp+.5bp\relax\hbox{\fontsize{5.6bp}{5.6bp}\selectfont$#1$}\hss}%
+  \hbox to0pt{\kern2.9bp\raise\dimexpr\P@rh bp-5.2bp\relax\hbox{\fontsize{5.6bp}{5.6bp}\selectfont$#2$}\hss}%
+  \hbox to0pt{\kern2.6bp\hbox{$\thinmuskip=3mu #3\mathrm{#4}#5$}\hss}}
+% aligned: its lines are set one under another with no extra space; each line starts with & and
+% its strut, and is exactly as high and as deep as that strut
+\def\P@setup{\thinmuskip=0mu \medmuskip=0mu \thickmuskip=0mu \def\P@h{6.4}\def\P@d{0}}
+\def\P@readstrut&\vrule height#1bp depth#2bp width0pt{\def\P@rh{#1}\def\P@rd{#2}\vrule height#1bp depth#2bp width0pt }
+\def\P@row{\setbox\P@rb\hbox\bgroup$\P@setup\expandafter\P@readstrut\romannumeral-`0}   % (skips a line break)
+\def\P@endrow{\xdef\P@lh{\P@rh}\xdef\P@ld{\P@rd}$\egroup\ht\P@rb=\P@lh bp \dp\P@rb=\P@ld bp \box\P@rb}
+\def\P@cr{\P@endrow\P@row}
+\def\P@array{\setbox\P@box\vbox\bgroup\offinterlineskip\let\\\P@cr\P@row}
+\def\P@endarray{\P@endrow\egroup\lower\dimexpr\P@d bp+.6bp-\dp\P@box\relax\box\P@box}
+% numerals are set from the text face of the same family, where every numeral is equally wide;
+% \cdot is set in the middle of a box 2.6bp wide
+\def\P@numeral#1{\begingroup\lccode`\~=`#1 \lowercase{\endgroup\def~}{\hbox{#1}}\mathcode`#1="8000 }
+% the characters [ and ] are made active inside the picture so that they can be drawn as strokes too
+\begingroup\catcode`\[=\active \catcode`\]=\active
+  \gdef\P@brackets{\catcode`\[=\active \catcode`\]=\active
+    \def[{\P@bar\P@hb\kern-.45bp\P@ht\kern-.45bp}\def]{\kern-.45bp\P@hb\kern-.45bp\P@ht\P@bar}}
+\endgroup
+\def\PortraitDrawing{\P@brackets
+  \P@numeral0\P@numeral1\P@numeral2\P@numeral3\P@numeral4\P@numeral5\P@numeral6\P@numeral7\P@numeral8\P@numeral9%
+  \let\P@cdot\cdot \def\cdot{\hbox to2.6bp{\hss$\P@cdot$\hss}}%
+  \def\lfloor{\P@bar\P@hb\kern-.45bp}\def\rfloor{\kern-.45bp\P@hb\P@bar}%
+  \def\lceil{\P@bar\P@ht\kern-.45bp}\def\rceil{\kern-.45bp\P@ht\P@bar}%
+  % \left<delimiter><strut> ... \right<delimiter> : the delimiter is as tall as the strut that follows it
+  \def\left##1\vrule height##2bp depth##3bp width0pt{\begingroup\def\P@h{##2}\def\P@d{##3}##1}%
+  \def\right##1{##1\endgroup}%
+  \def\int_##1^##2##3\mathrm##4##5{\P@int{##1}{##2}{##3}{##4}{##5}}%
+  \renewenvironment{aligned}{\P@array}{\P@endarray}}
+% the page: the expression in math mode, in a box exactly as large as the paper
+\def\PortraitBegin{%
+  \setbox\P@box\hbox{\fontsize{9.4bp}{9.4bp}\selectfont$0$\fontsize{5.6bp}{5.6bp}\selectfont$0$%
+     \fontsize{3.57bp}{3.57bp}\selectfont$\inttop\intbottom$}%                      (loads the three sizes used)
+  \setbox\P@page\hbox\bgroup\fontsize{9.4bp}{9.4bp}\selectfont\PortraitDrawing$}
+\def\PortraitEnd{$\egroup\setbox\P@page\hbox{\raise\dp\P@page\box\P@page}\ht\P@page=973bp \dp\P@page=0pt \box\P@page}
+\makeatother
+
+\begin{document}%
+\PortraitBegin
+% >>> THE EXPRESSION BEGINS
+@@BODY@@
+% <<< THE EXPRESSION ENDS
+\PortraitEnd
+\end{document}
+
+Everything below this line is ignored by LaTeX. It restates the result and lets
+you check it without trusting the picture.
+
+VALUE
+@@N@@
+
+THE SAME EXPRESSION ON ONE LINE
+@@LINEAR@@
+
+In the line above, * is multiplication, parentheses are the brackets, floor() and
+ceiling() are the floor and ceiling, and integrate(f, (x, a, b)) is the definite
+integral of f from a to b. It is valid Python and valid SymPy.
+
+CHECKER  (save as check.py and run:  python3 check.py portrait.tex)
+
+@@CHECKER@@

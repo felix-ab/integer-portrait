@@ -1,17 +1,19 @@
 \documentclass{article}
 \usepackage[paperwidth=18in,paperheight=18in,margin=0in]{geometry}
-\input{kit.tex}
-\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{unicode-math}
+\usepackage{graphicx,xcolor}
+\setmainfont{NewCM10-Book.otf}
+\setmathfont{NewCMMath-Book.otf}
 \definecolor{paper}{HTML}{F4EFE6}
 \definecolor{ink}{HTML}{131211}
 \pagestyle{empty}\parindent=0pt\topskip=0pt
-\newbox\Page
 \input{value.tex}
 \begin{document}
 \pagecolor{paper}\color{ink}%
 \vbox to\paperheight{\offinterlineskip
   \vskip 1.35in
-  \hbox to\paperwidth{\hss{\Num\setbox\Page\hbox{\input{body.tex}}\ht\Page=973bp \dp\Page=0pt \box\Page}\hss}
+  \hbox to\paperwidth{\hss\includegraphics[width=1080bp]{portrait.pdf}\hss}
   \vskip .34in
   \hbox to\paperwidth{\hss\fontsize{8.7bp}{10bp}\selectfont$=\;$\TheValue\hss}
   \vss
