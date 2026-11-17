@@ -2,18 +2,26 @@
 """
 The portrait as ONE expression that evaluates to an integer.
 
+Only ordinary notation is used, so no key is needed to read it:
+
+  decimal integers                      8853
+  products                              by juxtaposition, or with a centred dot
+  sums                                  with +, also across lines inside tall brackets
+  grouping brackets, floor, ceiling     [ 7 ]   |_ 7 _|   |^ 7 ^|
+  definite integrals of polynomials     int_0^3 dx
+
 One font, one weight (New Computer Modern). Tone comes only from structure:
 
   white      space between factors
   lightest   long integral signs, far apart
   light      long bracket pairs around a numeral
   mid        runs of numerals (1 and 7 are light, 6 and 9 are dark)
-  dark       numerals wrapped in ever deeper nests of brackets
+  dark       numerals wrapped in ever deeper nests of brackets, floors and ceilings
 
 Where the picture is vertically even, the strokes run the full height of the
-region (a "leaf"); elsewhere the expression is set in fine rows. Stacked rows
-are a column vector inside || . ||_1 (its value is the sum of the rows); things
-side by side are multiplied.
+region (a "leaf"); elsewhere the expression is set in fine rows. Rows stacked
+inside a tall bracket are the lines of one sum: every line after the first
+begins with +. Things side by side are factors of a product.
 
 Needs a photograph as source.png (not included in the repository).
 Writes body.tex (LaTeX), value.tex, expression.txt (linear form) and value.txt.
@@ -32,7 +40,9 @@ FS = 9.4; ADV = FS / 2                # type size and numeral advance
 TH = 0.5                              # stroke thickness of every delimiter
 DL = 1.0                              # pitch of nested delimiters
 FH = 6.4                              # height of a delimiter in a fine row
-GL, GR = 2.0, 5.5                     # gutters of a stack: || on the left, ||_1 on the right
+PW = 7.5                              # room for the + that begins each line of a sum after the first
+GL, GR = 1.5 + PW, 1.5                # a bracketed sum: [ and the + signs on the left, ] on the right
+MINSW = 5                             # leftovers narrower than this beside long strokes are absorbed into them
 HI = float(args.get('hi', 0.43))      # darkest ink the structures can reach
 GAMMA = float(args.get('gamma', 0.92))
 PHI = float(args.get('phi', 97.0)); PLO = float(args.get('plo', 1.0))
@@ -123,6 +133,8 @@ def carve(r0, r1, c0, c1):
     if b is None:
         return dict(t='fine', r=(r0, r1), c=(c0, c1))
     a0, a1, b0, b1 = b
+    if 0 < b0 - c0 < MINSW: b0 = c0
+    if 0 < c1 - b1 < MINSW: b1 = c1
     mid = []
     if b0 > c0: mid.append(carve(a0, a1, c0, b0))
     mid.append(dict(t='leaf', r=(a0, a1), c=(b0, b1)))
@@ -181,7 +193,7 @@ def want(r0, r1, xa, xb):
     return tot * RP
 
 
-DELIMS = ['bar', 'brk', 'flr', 'cel']
+DELIMS = ['brk', 'flr', 'cel']        # [ ] grouping, floor, ceiling: each has one meaning (no bare | |)
 
 
 def kinds(k):
@@ -294,7 +306,7 @@ def fill_seg(xa, xb, r):
 
 
 # ------------------------------------------------------------------ layout + fill
-stats = dict(leaf=0, seg=0, stk=0, strokes=0, numerals=0, ints=0, longest=0.0)
+stats = dict(leaf=0, seg=0, stk=0, strokes=0, numerals=0, ints=0, plus=0, dots=0, longest=0.0)
 
 
 def lay(stk, xa, xb):
@@ -319,7 +331,7 @@ def lay(stk, xa, xb):
                     p_['units'].pop(-2)
         if not any(it['t'] == 'stk' or it['units'] for it in items):      # a band may not be empty
             it = items[len(items) // 2]
-            it['units'].append(dict(u='nest', x=(it['x'][0] + it['x'][1]) / 2 - 3.5, k=1, d=1, kinds=['bar'], inner=6.0, ink=0))
+            it['units'].append(dict(u='nest', x=(it['x'][0] + it['x'][1]) / 2 - 3.5, k=1, d=1, kinds=['brk'], inner=6.0, ink=0))
 
 
 lay(root, 0.0, float(W))
@@ -341,12 +353,13 @@ def band_tokens(items):
             if u['u'] == 'op':
                 toks.append(('+',) if u['op'] == '+' else ('*',))
             elif u['u'] == 'int':
-                lo, up, _, f, v = u['spec']; toks.append(('v', v, 'Int(%d,%d,lambda %s: %s)' % (lo, up, u['var'], f.replace('x', u['var']))))
+                lo, up, _, fx, v = u['spec']
+                toks.append(('v', v, 'integrate(%s, (%s, %d, %d))' % (fx.replace('x', u['var']), u['var'], lo, up)))
             else:
-                s = str(u['d'])
+                t = str(u['d'])
                 for kd in reversed(u['kinds']):
-                    s = {'bar': 'abs(%s)', 'brk': '(%s)', 'flr': 'floor(%s)', 'cel': 'ceil(%s)'}[kd] % s
-                toks.append(('v', u['d'], s))
+                    t = {'brk': '(%s)', 'flr': 'floor(%s)', 'cel': 'ceiling(%s)'}[kd] % t
+                toks.append(('v', u['d'], t))
         if run:
             toks.append(('v', int(run), run))
     return toks
@@ -371,51 +384,50 @@ def band_lin(items):
 
 
 def value(stk):
-    return sum(abs(band_value(items)) for (_, _, items) in stk['ent'])
+    """a bracketed sum: the sum of its lines"""
+    return sum(band_value(items) for (_, _, items) in stk['ent'])
 
 
 def lin(stk):
-    return 'N1([' + ', '.join(band_lin(items) for (_, _, items) in stk['ent']) + '])'
+    return '(' + ' + '.join(band_lin(items) for (_, _, items) in stk['ent']) + ')'
 
 
 N = value(root)
-if 'prime' in args:
-    # Make the value prime by swapping ONE numeral for the numeral closest to it in weight
-    # (searching from the last row upwards), so the picture does not change.
-    import gmpy2
-    cands = []
-
-    def collect(stk):
-        for (_, _, items) in stk['ent']:
-            for it in items:
-                if it['t'] == 'stk': collect(it)
-                elif it['t'] == 'seg': cands.extend(u for u in it['units'] if u['u'] == 'num')
-    collect(root)
-    tried, found = 0, False
-    for u in reversed(cands):
-        old = u['d']
-        alts = sorted((d for d in range(0 if not u['first'] else 1, 10) if d != old), key=lambda d: abs(INK[d] - INK[old]))[:2]
-        for d in alts:
-            u['d'] = d; tried += 1
-            M = value(root)
-            if M % 2 and gmpy2.is_strong_bpsw_prp(M):
-                N, found = M, True; break
-        if found:
-            print('swapped one numeral %d -> %d' % (old, u['d'])); break
-        u['d'] = old
-    print('prime search: %d candidates tried, %s' % (tried, 'found' if found else 'none found'))
-    assert found and gmpy2.is_prime(N, 40)
-else:
-    N = value(root)
 expr = lin(root)
+
+
+def audit(stk, depth=0):
+    """Every line must read unambiguously under ordinary conventions."""
+    n = 0
+    for (_, _, items) in stk['ent']:
+        toks = band_tokens(items); n += 1
+        assert toks and toks[0][0] == 'v' and toks[-1][0] == 'v', 'a line must begin and end with a factor'
+        for p_, q_ in zip(toks, toks[1:]):
+            assert p_[0] == 'v' or q_[0] == 'v', 'two operators in a row'
+            if p_[0] == 'v' and q_[0] == 'v':                      # juxtaposed factors: never two bare numbers
+                assert not (p_[2].isdigit() and q_[2].isdigit()), 'two numbers side by side would read as one'
+        for tk in toks:
+            if tk[0] == 'v':
+                assert tk[1] > 0, 'every factor is a positive integer'
+                if tk[2].isdigit():
+                    assert tk[2][0] != '0', 'no leading zeros'
+        for it in items:
+            if it['t'] == 'stk':
+                n += audit(it, depth + 1)
+    return n
+
+
+LINES = audit(root)
 open('expression.txt', 'w').write(expr + '\n')
 open('value.txt', 'w').write(str(N) + '\n')
 open('value.tex', 'w').write('\\def\\TheValue{%s}\\def\\TheDigits{%d}\n' % (N, len(str(N))))
 
 # ------------------------------------------------------------------ LaTeX
-# Each band of a stack is one running row: \k moves right, strokes are bare rules,
-# numerals are plain text. Coordinates are bp from the band's baseline (floor + .3).
+# Each line of a sum is one running row: \K moves right, delimiters are rules,
+# numerals are plain text. Coordinates are bp from the row's baseline (floor + .3).
 BASE = 0.3
+NAME = {('brk', 'l'): 'OpenBracket', ('brk', 'r'): 'CloseBracket', ('flr', 'l'): 'OpenFloor', ('flr', 'r'): 'CloseFloor',
+        ('cel', 'l'): 'OpenCeil', ('cel', 'r'): 'CloseCeil'}
 
 
 def f(x):
@@ -435,15 +447,20 @@ class Row:
     def stroke(self, kd, side, x, yb, h):
         stats['strokes'] += 1
         self.go(x)
-        self.s.append(r'\X%s%s{%s}{%s}' % ({'bar': 'b', 'brk': 'q', 'flr': 'f', 'cel': 'c'}[kd], '' if kd == 'bar' else side,
-                                          f(yb - BASE), f(yb - BASE + h)))
+        self.s.append(r'\%s{%s}{%s}' % (NAME[kd, side], f(yb - BASE), f(yb - BASE + h)))
         self.cur = x + TH
 
     def num(self, x, d, lift=0.0):
         stats['numerals'] += 1
         self.go(x)
-        self.s.append(str(d) if not lift else r'\Lf{%s}{%d}' % (f(lift), d))
+        self.s.append(str(d) if not lift else r'\Lift{%s}{%d}' % (f(lift), d))
         self.cur = x + ADV
+
+    def op(self, x, w, sym, lift=0.0):
+        stats['plus' if sym == '+' else 'dots'] += 1
+        self.go(x)
+        self.s.append(r'\%s{%s}{%s}' % ('Plus' if sym == '+' else 'Times', f(w), f(lift)))
+        self.cur = x + w
 
 
 def emit_units(row, units, x0, h, tall):
@@ -452,11 +469,11 @@ def emit_units(row, units, x0, h, tall):
         if u['u'] == 'num':
             row.num(x, u['d'])
         elif u['u'] == 'op':
-            row.go(x); row.s.append(r'\Op{%s}{%s}' % (f(u['w']), '+' if u['op'] == '+' else r'\cdot')); row.cur = x + u['w']
+            row.op(x, u['w'], u['op'])
         elif u['u'] == 'int':
             lo, up, tx, _, _ = u['spec']; stats['ints'] += 1; stats['strokes'] += 1
             row.go(x)
-            row.s.append(r'\I{%s}{%s}{%d}{%d}{%s}{%s}{%s}' % (f(0.6 - BASE), f(h - 1.2), lo, up, tx.replace('x', u['var']), f(h / 2 - RP / 2), u['var']))
+            row.s.append(r'\Integral{%s}{%s}{%d}{%d}{%s}{%s}{%s}' % (f(0.6 - BASE), f(h - 1.2), lo, up, tx.replace('x', u['var']), f(h / 2 - RP / 2), u['var']))
         else:
             k, hh = u['k'], (h - 1.2 if tall else FH)
             yb = 0.6 if tall else (RP - FH) / 2
@@ -469,27 +486,44 @@ def emit_units(row, units, x0, h, tall):
 
 
 def emit(stk):
+    """a sum whose lines are stacked inside one tall pair of brackets"""
     xa, xb = stk['x']; r0, r1 = stk['r']; Hs = (r1 - r0) * RP
-    s = [r'\Sb{%s}{%s}' % (f(xb - xa), f(Hs))]
-    for (a, b, items) in stk['ent']:
+    stats['strokes'] += 2
+    s = [r'\BeginSum{%s}{%s}' % (f(xb - xa), f(Hs))]
+    for i, (a, b, items) in enumerate(stk['ent']):
         y0 = (r1 - b) * RP; h = (b - a) * RP
         row = Row()
+        if i:                                                      # every line after the first begins with +
+            row.op(1.5, PW, '+', h / 2 - RP / 2)
         for it in items:
             if it['t'] == 'stk':
                 row.go(it['x'][0] - xa)
-                row.s.append(r'\Ab ' + emit(it) + r'\Ae ')
+                row.s.append(r'\Factor ' + emit(it) + r'\EndFactor ')
             else:
                 emit_units(row, it['units'], xa, h, it['t'] == 'leaf')
-        s.append(r'\Bd{%s}' % f(y0 + BASE) + ''.join(row.s) + '\\Be%\n')
-    s.append(r'\Se')
+        s.append(r'\Row{%s}' % f(y0 + BASE) + ''.join(row.s) + '\\EndRow%\n')
+    s.append(r'\EndSum')
     return ''.join(s)
 
 
-open('body.tex', 'w').write(emit(root) + '%\n')
+HEADER = """% One mathematical expression. Generated by build.py.
+%
+% Notation (all standard):  decimal integers;  products by juxtaposition or \\cdot;  sums with +,
+% including sums whose lines are stacked inside a tall pair of brackets (every line after the
+% first begins with +);  [ ] grouping, floor and ceiling;  definite integrals of polynomials.
+%
+% Layout macros (kit.tex):  \\K = horizontal move,  \\Lift = a numeral raised to the middle of a tall
+% bracket,  \\Open.../\\Close... = a delimiter drawn from one height to another,  \\Plus, \\Times = the
+% operators + and \\cdot,  \\Integral{..}{..}{a}{b}{f}{..}{x} = \\int_a^b f dx,
+% \\BeginSum ... \\EndSum = [ lines of a sum ],  \\Row ... \\EndRow = one line,  \\Factor = a bracketed
+% sum used as a factor.
+"""
+open('body.tex', 'w').write(HEADER + emit(root) + '%\n')
 digits = len(str(N))
-json.dump(dict(stats, value_digits=digits, W=W, H=H), open('stats.json', 'w'))
-print('stacks %(stk)d, long-stroke leaves %(leaf)d, fine rows %(seg)d' % stats)
-print('strokes %(strokes)d (integral signs %(ints)d), numerals %(numerals)d, longest stroke %(longest).0f bp' % stats)
+json.dump(dict(stats, lines=LINES, value_digits=digits, W=W, H=H), open('stats.json', 'w'))
+print('bracketed sums %(stk)d, long-stroke leaves %(leaf)d, fine rows %(seg)d' % stats)
+print('delimiter strokes %(strokes)d (integral signs %(ints)d), numerals %(numerals)d, plus signs %(plus)d, dots %(dots)d, longest stroke %(longest).0f bp' % stats)
+print('notation audit passed on %d lines of the sum' % LINES)
 print('the expression evaluates to an integer of %d digits: %s...%s' % (digits, str(N)[:12], str(N)[-12:]))
 
 if 'debug' in args:

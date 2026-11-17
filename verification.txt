@@ -1,7 +1,6 @@
-1. expression.txt: 73035 characters; 16 stacks, 30 integral signs, 19848 strokes, 16685 numerals
-   evaluated independently: an integer of 221 digits; equal to value.txt: True
-   type int, exact (no floating point anywhere)
-2. page vs requested tone, blurred over 6 bp: correlation 0.966, rms ink error 0.032
-2. page vs requested tone, blurred over 12 bp: correlation 0.985, rms ink error 0.021
-   mean ink requested 0.219, printed 0.224; lightest region 0.001, darkest 0.417
-3. glyphs in the PDF text layer: 16763 digits (numerals 16685 + limits, indices and integrands)
+expression.txt: 83242 characters, 223 lines of sums, 19954 delimiter strokes, 16616 numerals, 26 integrals
+names used in the expression: ceiling, floor, integrate, s, t, u, x, y
+1. own exact evaluator : integer of 220 digits; equals value.txt: True
+2. SymPy 1.14.0        : integer of 220 digits; equals value.txt: True
+3. page vs requested tone, blurred over 6 bp: correlation 0.972, rms ink error 0.029
+3. page vs requested tone, blurred over 12 bp: correlation 0.987, rms ink error 0.019
